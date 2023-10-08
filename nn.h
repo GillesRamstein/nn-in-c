@@ -28,7 +28,8 @@ typedef struct {
 #define MAT_AT(mat, row, col) mat.p_data[(row)*(mat).num_cols + (col)]
 
 Matrix mat_alloc(size_t num_rows, size_t num_cols);
-void mat_print(Matrix m);
+void mat_print(Matrix m, const char *name);
+#define MAT_PRINT(m) mat_print(m, #m);
 void mat_fill(Matrix m, float val);
 float rand_float();
 void mat_rand(Matrix m, float min, float max);
@@ -57,8 +58,8 @@ Matrix mat_alloc(size_t num_rows, size_t num_cols) {
   return m;
 }
 
-void mat_print(Matrix m) {
-  printf("[\n");
+void mat_print(Matrix m, const char *name) {
+  printf("%s = [\n", name);
   for (size_t row=0; row<m.num_rows; ++row) {
     printf("  ");
     for (size_t col=0; col<m.num_cols; ++col) {
@@ -119,7 +120,6 @@ void mat_mul_mat(Matrix dst, Matrix a, Matrix b) {
   assert(a.num_cols == b.num_rows);
   assert(dst.num_rows == a.num_rows);
   assert(dst.num_cols == b.num_cols);
-  printf("%zu\n", a.num_rows);
   for (size_t row=0; row<dst.num_rows; ++row) {
     for (size_t col=0; col<dst.num_cols; ++col) {
       float tmp = 0;
