@@ -131,8 +131,8 @@ void mat_add_num(Matrix m, float x) {
 }
 
 void mat_add_mat(Matrix a, Matrix b) {
-  assert(a.num_cols == b.num_cols);
-  assert(a.num_rows == b.num_rows);
+  NN_ASSERT(a.num_cols == b.num_cols);
+  NN_ASSERT(a.num_rows == b.num_rows);
   for (size_t row=0; row<a.num_rows; ++row) {
     for (size_t col=0; col<a.num_cols; ++col) {
       MAT_AT(a, row, col) += MAT_AT(b, row, col);
@@ -149,11 +149,11 @@ void mat_mul_num(Matrix m, float x) {
 }
 
 void mat_mul_mat(Matrix dst, Matrix a, Matrix b) {
-  assert(a.num_cols == b.num_rows);
+  NN_ASSERT(a.num_cols == b.num_rows);
   size_t inner_dim = a.num_cols;
 
-  assert(dst.num_rows == a.num_rows);
-  assert(dst.num_cols == b.num_cols);
+  NN_ASSERT(dst.num_rows == a.num_rows);
+  NN_ASSERT(dst.num_cols == b.num_cols);
   for (size_t row=0; row<dst.num_rows; ++row) {
     for (size_t col=0; col<dst.num_cols; ++col) {
       MAT_AT(dst, row, col) = 0;

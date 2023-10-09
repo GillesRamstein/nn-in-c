@@ -106,7 +106,7 @@ int main(void) {
   mat_mul_num(m_4_3, 10);
   MAT_PRINT(m_4_3);
   printf("\n");
-  
+
   // mul_mat
   Matrix dst = mat_alloc(3, 4);
   mat_fill(dst, 0);
