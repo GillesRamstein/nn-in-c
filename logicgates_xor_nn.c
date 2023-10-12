@@ -114,11 +114,6 @@ void model_forward(ModelXOR m){
   // output y_hat = *m.h2.p_data
 }
 
-float squared_error(float y, float y_hat) {
-  float d = y - y_hat;
-  return d * d;
-}
-
 float cost(const ModelXOR m, const Matrix x, const Matrix y) {
   assert(x.num_rows == y.num_rows); // number of samples
   assert(y.num_cols == m.y_out.num_cols); // target and model output dimension
@@ -221,19 +216,9 @@ void model_eval(ModelXOR m, Matrix x_eval, Matrix y_eval) {
 }
 
 int main(void) {
-
-  size_t layer_dims[] = {3, 7, 7, 4, 1};
-  NN nn = nn_alloc(layer_dims, ARRAY_LEN(layer_dims));
-  NN_PRINT(nn);
-
-  return 0;
-
   srand(time(0));
 
-  // prepare data
-  printf("\n ----------------------------- ");
-  printf("\n --- PREPARE TRAINING DATA --- ");
-  printf("\n ----------------------------- \n");
+  // training data
   float * training_data = TRAIN_XOR;
   printf("N_TRAIN: %d\n", (int)N_SAMPLES);
 
@@ -254,47 +239,71 @@ int main(void) {
   MAT_PRINT(y_train);
 
 
-  // init model
-  ModelXOR m = model_init();
-
-
-  // eval untrained model
-  printf("\n ------------------------- ");
-  printf("\n --- INITIALISED MODEL --- ");
-  printf("\n ------------------------- \n");
-  model_print_w(m);
-  printf("---------------------\n");
-  model_eval(m, x_train, y_train);
-
   // training params
   const size_t EPOCHS = 100*1000;
   const float LR = 1e-1;
   const float EPS = 1e-1;
 
-  compute_finite_diffs(m, x_train, y_train, EPS);
-  model_update(m, LR);
 
-  // training loop
-  printf("\n --------------------- ");
-  printf("\n --- TRAINING LOOP --- ");
-  printf("\n --------------------- \n");
-  for (size_t i=0; i<EPOCHS; ++i) {
+  if (1) {
+    // Using NN framework
+
+    printf("--------------------------\n");
+    size_t layer_dims[] = {2, 2, 1};
+    NN nn = nn_alloc(layer_dims, ARRAY_LEN(layer_dims));
+    nn_rand(nn, 0, 1);
+    NN_PRINT(nn);
+
+    printf("--------------------------\n");
+    for (size_t i = 0; i < EPOCHS; ++i) {
+      nn_fdiffs(nn, x_train, y_train, EPS);
+      nn_update_weights(nn, LR);
+      if (0 || i % (EPOCHS/10)==0) {
+        printf("(%zu) mse = %f\n", i, nn_cost(nn, x_train, y_train));
+      }
+    }
+    printf("(%zu) mse = %f\n", EPOCHS, nn_cost(nn, x_train, y_train));
+
+    printf("--------------------------\n");
+    nn_eval(nn, x_train, y_train);
+
+  } else {
+
+    // init model
+    ModelXOR m = model_init();
+
+    // eval untrained model
+    printf("\n ------------------------- ");
+    printf("\n --- INITIALISED MODEL --- ");
+    printf("\n ------------------------- \n");
+    model_print_w(m);
+    printf("---------------------\n");
+    model_eval(m, x_train, y_train);
+
     compute_finite_diffs(m, x_train, y_train, EPS);
     model_update(m, LR);
-    if (0 || i % (EPOCHS/10)==0) {
-      printf("(%zu) mse = %f\n", i, cost(m, x_train, y_train));
+
+    // training loop
+    printf("\n --------------------- ");
+    printf("\n --- TRAINING LOOP --- ");
+    printf("\n --------------------- \n");
+    for (size_t i=0; i<EPOCHS; ++i) {
+      compute_finite_diffs(m, x_train, y_train, EPS);
+      model_update(m, LR);
+      if (0 || i % (EPOCHS/10)==0) {
+        printf("(%zu) mse = %f\n", i, cost(m, x_train, y_train));
+      }
     }
+
+    // eval model after training
+    printf("\n ---------------------- ");
+    printf("\n --- AFTER TRAINING --- ");
+    printf("\n ---------------------- \n");
+    model_print_w(m);
+    printf("---------------------\n");
+    model_print_g(m);
+    printf("---------------------\n");
+    printf("mse = %f\n", cost(m, x_train, y_train));
+    model_eval(m, x_train, y_train);
   }
-
-
-  // eval model after training
-  printf("\n ---------------------- ");
-  printf("\n --- AFTER TRAINING --- ");
-  printf("\n ---------------------- \n");
-  model_print_w(m);
-  printf("---------------------\n");
-  model_print_g(m);
-  printf("---------------------\n");
-  printf("mse = %f\n", cost(m, x_train, y_train));
-  model_eval(m, x_train, y_train);
 }

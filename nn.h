@@ -24,6 +24,7 @@
 #define ARRAY_LEN(arr) sizeof(arr)/sizeof(arr[0])
 
 float rand_float();
+float squared_error(float y, float y_hat);
 float sigmoid(float x);
 
 // --------------------------------------------------------------
@@ -63,9 +64,19 @@ typedef struct {
   Matrix *gb; // gradient vectors; n_layers-1 vectors
 } NN;
 
+#define NN_X_IN(nn) (nn).h[0]
+#define NN_Y_OUT(nn) (nn).h[(nn).n_layers-1]
+
 NN nn_alloc(size_t *layer_dims, size_t n_layers);
 void nn_print(NN nn, const char *name);
 #define NN_PRINT(nn) nn_print(nn, #nn)
+
+void nn_rand(NN m, float min, float max);
+void nn_forward(NN nn);
+float nn_cost(const NN nn, const Matrix x, const Matrix y);
+void nn_fdiffs(NN nn, const Matrix x, const Matrix y, const float eps);
+void nn_update_weights(NN nn, float lr);
+void nn_eval(NN nn, Matrix x_eval, Matrix y_eval);
 
 #endif // NN_H
 
@@ -82,6 +93,11 @@ void nn_print(NN nn, const char *name);
 
 float rand_float(void) {
   return (float) rand() / (float) RAND_MAX;
+}
+
+float squared_error(float y, float y_hat) {
+  float d = y - y_hat;
+  return d * d;
 }
 
 float sigmoidf(float x) {
@@ -202,8 +218,6 @@ void mat_sigmoid(Matrix m) {
 NN nn_alloc(size_t *layer_dims, size_t n_layers) {
   NN_ASSERT(n_layers > 0);
 
-  printf("%p, %zu\n", layer_dims, n_layers);
-
   // init NN struct
   NN nn;
   nn.n_layers = n_layers;
@@ -245,6 +259,103 @@ void nn_print(NN nn, const char *name) {
     printf("\n");
   }
   printf("]\n");
+}
+
+void nn_rand(NN nn, float min, float max) {
+  for (size_t i = 0; i < nn.n_layers-1; ++i) {
+    mat_rand(nn.w[i], min, max);
+    mat_rand(nn.b[i], min, max);
+  }
+  // for (size_t i = 0; i < nn.n_layers; ++i) {
+  //   mat_fill(nn.h[i], 0);
+  //   if (i < nn.n_layers-1) {
+  //     mat_rand(nn.w[i], min, max);
+  //     mat_rand(nn.b[i], min, max);
+  //     mat_fill(nn.gw[i], 0);
+  //     mat_fill(nn.bw[i], 0);
+  //   }
+  // }
+}
+
+void nn_forward(NN nn){
+  for (size_t i = 0; i < nn.n_layers-1; ++i) {
+    mat_mul_mat(nn.h[i+1], nn.h[i], nn.w[i]);
+    mat_add_mat(nn.h[i+1], nn.b[i]);
+    mat_sigmoid(nn.h[i+1]);
+  }
+}
+
+
+float nn_cost(const NN nn, const Matrix x, const Matrix y) {
+  assert(x.num_rows == y.num_rows); // number of samples
+  assert(y.num_cols == NN_Y_OUT(nn).num_cols); // target and model output dimension
+  size_t n_samples = x.num_rows;
+
+  float sq_err = 0;
+  for (size_t i=0; i<n_samples; ++i) {
+    Matrix x_i = mat_row(x, i);
+    Matrix y_i = mat_row(y, i);
+    mat_copy(NN_X_IN(nn), x_i);
+    nn_forward(nn);
+    size_t y_dim = y.num_cols;
+    for (size_t j=0; j<y_dim; ++j) {
+      sq_err += squared_error(MAT_AT(y_i, 0, j), MAT_AT(NN_Y_OUT(nn), 0, j));
+    }
+  }
+  return sq_err / n_samples;
+}
+
+void nn_fdiffs(NN nn, const Matrix x, const Matrix y, const float eps) {
+  float saved;
+  const float mse = nn_cost(nn, x, y);
+  for (size_t k = 0; k < nn.n_layers-1; ++k) {
+    for (size_t i=0; i<nn.w[k].num_rows; ++i) {
+      for (size_t j=0; j<nn.w[k].num_cols; ++j) {
+        saved = MAT_AT(nn.w[k], i, j);
+        MAT_AT(nn.w[k], i, j) += eps;
+        MAT_AT(nn.gw[k], i, j) = (nn_cost(nn, x, y)-mse)/eps;
+        MAT_AT(nn.w[k], i, j) = saved;
+      }
+    }
+    for (size_t i=0; i<nn.b[k].num_rows; ++i) {
+      for (size_t j=0; j<nn.b[k].num_cols; ++j) {
+        saved = MAT_AT(nn.b[k], i, j);
+        MAT_AT(nn.b[k], i, j) += eps;
+        MAT_AT(nn.gb[k], i, j) = (nn_cost(nn, x, y)-mse)/eps;
+        MAT_AT(nn.b[k], i, j) = saved;
+      }
+    }
+  }
+}
+
+void nn_update_weights(NN nn, float lr) {
+  for (size_t k = 0; k < nn.n_layers-1; ++k) {
+    for (size_t i=0; i<nn.w[k].num_rows; ++i) {
+      for (size_t j=0; j<nn.w[k].num_cols; ++j) {
+        MAT_AT(nn.w[k], i, j) -= lr * MAT_AT(nn.gw[k], i, j);
+      }
+    }
+    for (size_t i=0; i<nn.b[k].num_rows; ++i) {
+      for (size_t j=0; j<nn.b[k].num_cols; ++j) {
+        MAT_AT(nn.b[k], i, j) -= lr * MAT_AT(nn.gb[k], i, j);
+      }
+    }
+  }
+}
+
+void nn_eval(NN nn, Matrix x_eval, Matrix y_eval) {
+  size_t n_samples = x_eval.num_rows;
+  for (size_t i=0; i<n_samples; ++i) {
+    mat_copy(NN_X_IN(nn), mat_row(x_eval, i));
+    nn_forward(nn);
+    printf(
+      "%d ^ %d = %f  (%d)\n",
+      (int)MAT_AT(x_eval, i, 0),
+      (int)MAT_AT(x_eval, i, 1),
+      MAT_AT(NN_Y_OUT(nn), 0, 0),
+      (int)MAT_AT(y_eval, i, 0)
+    );
+  }
 }
 
 #endif // NN_IMPLEMENTATION
