@@ -42,6 +42,10 @@ float TRAIN_XOR[] = {
 const size_t STRIDE = 3;
 const size_t N_SAMPLES = sizeof(TRAIN_OR)/sizeof(TRAIN_OR[0])/STRIDE;
 
+// size_t layer_dims[] = {3, 7, 1};
+// size_t n_layers = ARRAY_LEN(layer_dims);
+// NN nn = nn_alloc(layer_dims, n_layers);
+
 typedef struct {
   Matrix x_in; // input h0
   Matrix w1, b1, h1, gw1, gb1;
@@ -217,6 +221,13 @@ void model_eval(ModelXOR m, Matrix x_eval, Matrix y_eval) {
 }
 
 int main(void) {
+
+  size_t layer_dims[] = {3, 7, 7, 4, 1};
+  NN nn = nn_alloc(layer_dims, ARRAY_LEN(layer_dims));
+  NN_PRINT(nn);
+
+  return 0;
+
   srand(time(0));
 
   // prepare data
