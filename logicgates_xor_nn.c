@@ -1,11 +1,9 @@
 /*
-Simple implementation of a Neural Network with
-three Neurons,
-two inputs, and
-a single output,
-with the goal of learning the OR, AND, NAND and XOR logic gate.
-
-Using nn.h library.
+Simple implementation of a Neural Network using nn.h library.
+The library allows to easily configure multi-layer, fully-connected
+feed forward networks.wit
+There are datasets to learn the behaviour of the OR, AND, NAND and XOR logic
+gates.
 */
 
 #define NN_IMPLEMENTATION
