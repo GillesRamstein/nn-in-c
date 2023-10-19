@@ -25,6 +25,7 @@
 #define ARRAY_LEN(arr) sizeof(arr) / sizeof(arr[0])
 
 float rand_float();
+void shuffle_array(size_t *array, size_t n);
 float squared_error(float y_pred, float y_true);
 float squared_error_derivative(float y_pred, float y_true);
 float sigmoid(float x);
@@ -132,6 +133,22 @@ void nn_update_weights(NN nn, const float lr, size_t n);
 #ifdef NN_IMPLEMENTATION
 
 float rand_float(void) { return (float)rand() / (float)RAND_MAX; }
+
+void shuffle_array(size_t *array, size_t n) {
+  if (n > RAND_MAX / 10) {
+    NN_ASSERT(0 && "n must be much smaller than RAND_MAX!");
+  }
+
+  if (n > 1) {
+    size_t i;
+    for (i = 0; i < n - 1; i++) {
+      size_t j = i + rand() / (RAND_MAX / (n - i) + 1);
+      size_t t = array[j];
+      array[j] = array[i];
+      array[i] = t;
+    }
+  }
+}
 
 float squared_error(float y_pred, float y_true) {
   float d = y_pred - y_true;
@@ -456,55 +473,73 @@ void nn_rand(NN nn, float min, float max) {
 }
 
 void nn_train_loop(NN nn, Matrix x, Matrix y, TrainParams p) {
-  /*
-  [EGD] (BATCH)EPOCH_GRADIENT_DESCENT:
-  [BGD] (MINI)BATCH_GRADIENT_DESCENT:
-  [SGD] STOCHASTIC_GRADIENT_DESCENT:
-  */
   const size_t n_samples = x.num_rows;
-  printf("Number of training Samples: %zu\n", n_samples);
+  printf("Training Samples in Epoch: %zu\n", n_samples);
 
-  const size_t n_batches = 1;
-  printf("Batch size: %zu (%zu batches and %zu leftover samples)\n",
-         p.batch_size, n_batches, n_samples % p.batch_size);
-  // TODO: implement BGD
-  if (p.gd_type == BGD) {
-    printf("BGD not implemented!\n");
-    NN_ASSERT(0);
+  // set n_batches and batch_size
+  size_t n_batches;
+  size_t batch_size;
+  switch (p.gd_type) {
+  case SGD:
+    printf("Step-GD: Update weights on each step.\n");
+    n_batches = n_samples;
+    batch_size = 1;
+    break;
+  case BGD:
+    printf("Batch-GD: Update weights on each batch.\n");
+    n_batches = (size_t)(n_samples / p.batch_size);
+    batch_size = p.batch_size;
+    break;
+  case EGD:
+    printf("Epoch-GD: Update weights on each epoch.\n");
+    n_batches = 1;
+    batch_size = n_samples;
+    break;
+  }
+  printf("Batch size: %zu -> %zu batches per epoch (%zu samples skipped)\n\n",
+         batch_size, n_batches, n_samples % batch_size);
+
+  // create map for accessing samples in a shuffled manner
+  size_t sample_map[n_samples];
+  for (size_t i = 0; i < n_samples; ++i) {
+    sample_map[i] = i;
   }
 
   // epoch loop
   for (size_t e = 0; e < p.epochs; ++e) {
     mat_fill(nn.loss_epoch, 0);
+    shuffle_array(sample_map, n_samples);
 
     // batch loop
     for (size_t b = 0; b < n_batches; ++b) {
       mat_fill(nn.loss_batch, 0);
 
       // sample loop
-      for (size_t s = 0; s < n_samples; ++s) {
+      for (size_t ss = 0; ss < batch_size; ++ss) {
+        // get sample index
+        size_t s = sample_map[ss+b*batch_size];
 
         // forward pass a single sample
         nn_set_input_layer_activations(nn, x, s);
         nn_forward(nn);
+        nn_update_losses(nn, y, s);
 
         // backprop errors and compute gradients
         nn_clear_errors(nn);
         nn_set_error_at_output_layer(nn, y, s);
         nn_backprop(nn);
-        nn_update_losses(nn, y, s);
 
         if (p.gd_type == SGD) {
           nn_update_weights(nn, p.lr, 1);
-          printf("[%zu] ", s);
-          NN_PRINT_LOSS(nn, SGD);
+          // printf("[%zu] ", s);
+          // NN_PRINT_LOSS(nn, SGD);
         }
 
       } // sample loop
       if (p.gd_type == BGD) {
-        nn_update_weights(nn, p.lr, p.batch_size);
-        printf("[%zu] ", b);
-        NN_PRINT_LOSS(nn, BGD);
+        nn_update_weights(nn, p.lr, batch_size);
+        // printf("[%zu] ", b);
+        // NN_PRINT_LOSS(nn, BGD);
       }
 
     } // batch loop

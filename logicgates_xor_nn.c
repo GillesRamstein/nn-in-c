@@ -80,10 +80,10 @@ int main(void) {
 
   // setup training parameters
   const TrainParams train_params = {
-      .lr = 1e-0,
-      .epochs = 10 * 1000,
-      .batch_size = N_SAMPLES,
-      .gd_type = EGD,
+      .lr = 1e-1,
+      .epochs = 10000,
+      .batch_size = 2, // only for BGD,
+      .gd_type = SGD,
   };
 
   // train network
