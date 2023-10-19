@@ -153,8 +153,7 @@ float sigma(float x, Sigma f) {
   case SIGMOID:
     return sigmoid(x);
   default:
-    printf("Unreachable!\n");
-    NN_ASSERT(0);
+    NN_ASSERT(0 && "Unreachable");
   }
 }
 
@@ -165,8 +164,7 @@ float sigma_derivative(float x, Sigma f) {
   case SIGMOID:
     return sigmoid_derivative(x);
   default:
-    printf("Unreachable!\n");
-    NN_ASSERT(0);
+    NN_ASSERT(0 && "Unreachable");
   }
 }
 
