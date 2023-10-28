@@ -563,17 +563,13 @@ void nn_train_loop(NN nn, Matrix x, Matrix y, TrainParams p) {
       // sample loop
       for (size_t ss = 0; ss < batch_size; ++ss) {
         // get sample index
-        size_t s = sample_map[ss+b*batch_size];
+        size_t s = sample_map[ss + b * batch_size];
 
         // forward pass a single sample
-        nn_set_input_layer_activations(nn, x, s);
-        nn_forward(nn);
-        nn_update_losses(nn, y, s);
+        nn_forward(nn, x, y, s);
 
         // backprop errors and compute gradients
-        nn_clear_errors(nn);
-        nn_set_error_at_output_layer(nn, y, s);
-        nn_backprop(nn);
+        nn_backprop(nn, y, s);
 
         if (p.gd_type == SGD) {
           nn_update_weights(nn, p.lr, 1);
@@ -607,8 +603,21 @@ void nn_set_input_layer_activations(NN nn, Matrix x, size_t s) {
   }
 }
 
-void nn_forward(NN nn) {
-  // activations of input layer must be set to sample already!
+void nn_update_losses(const NN nn, const Matrix y, size_t s) {
+  NN_ASSERT(y.num_cols == NN_Y_OUT(nn).num_cols);
+
+  for (size_t j = 0; j < y.num_cols; ++j) {
+    float a_L = MAT_AT(NN_Y_OUT(nn), 0, j);
+    float y_true = MAT_AT(y, s, j);
+    float sq_err = squared_error(a_L, y_true);
+    MAT_AT(nn.loss_step, 0, j) = sq_err;
+    MAT_AT(nn.loss_batch, 0, j) += sq_err;
+    MAT_AT(nn.loss_epoch, 0, j) += sq_err;
+  }
+}
+
+void nn_forward(NN nn, const Matrix x, const Matrix y, const size_t s) {
+  nn_set_input_layer_activations(nn, x, s);
 
   // for layer l in [1, 2, ..., L-1]
   for (size_t l = 0; l < nn.n_layers - 1; ++l) {
@@ -638,19 +647,8 @@ void nn_forward(NN nn) {
       }
     }
   }
-}
 
-void nn_update_losses(const NN nn, const Matrix y, size_t s) {
-  NN_ASSERT(y.num_cols == NN_Y_OUT(nn).num_cols);
-
-  for (size_t j = 0; j < y.num_cols; ++j) {
-    float a_L = MAT_AT(NN_Y_OUT(nn), 0, j);
-    float y_true = MAT_AT(y, s, j);
-    float sq_err = squared_error(a_L, y_true);
-    MAT_AT(nn.loss_step, 0, j) = sq_err;
-    MAT_AT(nn.loss_batch, 0, j) += sq_err;
-    MAT_AT(nn.loss_epoch, 0, j) += sq_err;
-  }
+  nn_update_losses(nn, y, s);
 }
 
 void nn_clear_errors(NN nn) {
@@ -659,7 +657,7 @@ void nn_clear_errors(NN nn) {
   }
 }
 
-void nn_set_error_at_output_layer(const NN nn, const Matrix y, size_t s) {
+void nn_set_error_at_output_layer(NN nn, const Matrix y, size_t s) {
   NN_ASSERT(y.num_cols == NN_Y_OUT(nn).num_cols);
 
   /*********************************************
@@ -675,10 +673,11 @@ void nn_set_error_at_output_layer(const NN nn, const Matrix y, size_t s) {
   }
 }
 
-void nn_backprop(NN nn) {
-  // errors at output layers must set be already!
+void nn_backprop(NN nn, const Matrix y, const size_t s) {
+  nn_clear_errors(nn);
+  nn_set_error_at_output_layer(nn, y, s);
 
-  // backpropagate error backwards from last to second layer
+  // propagate error backwards from last to second layer
   /*************************************************
    * e_j[l]=sigma'(z_j[l])*SUM{w_ji[l+1]*e_i[l+1]} *
    *************************************************/
