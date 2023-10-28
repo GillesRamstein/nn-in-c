@@ -30,11 +30,17 @@ float squared_error(float y_pred, float y_true);
 float squared_error_derivative(float y_pred, float y_true);
 float sigmoid(float x);
 float sigmoid_derivative(float x);
+float relu(float x);
+float relu_derivative(float x);
+float leaky_relu(float x);
+float leaky_relu_derivative(float x);
 
 typedef enum {
   // Implemented activation functions
   IDENTITY = 0,
   SIGMOID = 1,
+  RELU = 2,
+  LEAKY_RELU = 3,
 } Sigma;
 
 float sigma(float x, Sigma f);
@@ -114,11 +120,11 @@ void nn_print(NN nn, const char *name);
 
 void nn_rand(NN m, const float min, const float max);
 void nn_set_input_layer_activations(NN nn, Matrix x, size_t s);
-void nn_forward(NN nn);
+void nn_forward(NN nn, const Matrix x, const Matrix y, const size_t s);
 void nn_update_losses(NN nn, const Matrix y, const size_t s);
 void nn_clear_errors(NN nn);
 void nn_set_error_at_output_layer(NN nn, const Matrix y, const size_t s);
-void nn_backprop(NN nn);
+void nn_backprop(NN nn, const Matrix y, const size_t s);
 void nn_update_weights(NN nn, const float lr, size_t n);
 
 #endif // NN_H
@@ -163,12 +169,48 @@ float sigmoid(float x) { return 1.f / (1.f + expf(-x)); }
 
 float sigmoid_derivative(float x) { return sigmoid(x) * (1 - sigmoid(x)); }
 
+float relu(float x) {
+  if (x > 0) {
+    return x;
+  } else {
+    return 0.f;
+  }
+}
+
+float relu_derivative(float x) {
+  if (x > 0) {
+    return 1.f;
+  } else {
+    return 0.f;
+  }
+}
+
+float leaky_relu(float x) {
+  if (x > 0) {
+    return x;
+  } else {
+    return 0.001f * x;
+  }
+}
+
+float leaky_relu_derivative(float x) {
+  if (x > 0) {
+    return 1.f;
+  } else {
+    return 0.001f;
+  }
+}
+
 float sigma(float x, Sigma f) {
   switch (f) {
   case IDENTITY:
     return x;
   case SIGMOID:
     return sigmoid(x);
+  case RELU:
+    return relu(x);
+  case LEAKY_RELU:
+    return leaky_relu(x);
   default:
     NN_ASSERT(0 && "Unreachable");
   }
@@ -180,6 +222,10 @@ float sigma_derivative(float x, Sigma f) {
     return 1.f;
   case SIGMOID:
     return sigmoid_derivative(x);
+  case RELU:
+    return relu_derivative(x);
+  case LEAKY_RELU:
+    return leaky_relu_derivative(x);
   default:
     NN_ASSERT(0 && "Unreachable");
   }
