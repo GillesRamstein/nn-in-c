@@ -311,19 +311,19 @@ NN nn_create(size_t *layer_dims, size_t n_layers, Sigma s_hidden,
   nn.s_output = s_output;
 
   // malloc arrays to hold matrices
-  nn.weighted_sums = malloc(n_layers * sizeof(*nn.weighted_sums));
+  nn.weighted_sums = NN_MALLOC(n_layers * sizeof(*nn.weighted_sums));
   NN_ASSERT(nn.weighted_sums != NULL);
-  nn.activations = malloc(n_layers * sizeof(*nn.activations));
+  nn.activations = NN_MALLOC(n_layers * sizeof(*nn.activations));
   NN_ASSERT(nn.activations != NULL);
-  nn.weights = malloc(n_layers * sizeof(*nn.weights));
+  nn.weights = NN_MALLOC(n_layers * sizeof(*nn.weights));
   NN_ASSERT(nn.weights != NULL);
-  nn.weight_grads = malloc(n_layers * sizeof(*nn.weight_grads));
+  nn.weight_grads = NN_MALLOC(n_layers * sizeof(*nn.weight_grads));
   NN_ASSERT(nn.weight_grads != NULL);
-  nn.biases = malloc(n_layers * sizeof(*nn.biases));
+  nn.biases = NN_MALLOC(n_layers * sizeof(*nn.biases));
   NN_ASSERT(nn.biases != NULL);
-  nn.bias_grads = malloc(n_layers * sizeof(*nn.bias_grads));
+  nn.bias_grads = NN_MALLOC(n_layers * sizeof(*nn.bias_grads));
   NN_ASSERT(nn.bias_grads != NULL);
-  nn.errors = malloc(n_layers * sizeof(*nn.errors));
+  nn.errors = NN_MALLOC(n_layers * sizeof(*nn.errors));
   NN_ASSERT(nn.errors != NULL);
 
   // malloc matrices in the arrays
