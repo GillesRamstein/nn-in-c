@@ -43,7 +43,8 @@ const size_t N_SAMPLES = sizeof(TRAIN_OR) / sizeof(TRAIN_OR[0]) / STRIDE;
 
 int main(void) {
   // set random seed
-  srand(time(0));
+  // srand(time(0));
+  srand(0);
 
   // setup training data
   float *training_data = TRAIN_XOR;
@@ -66,20 +67,22 @@ int main(void) {
   MAT_PRINT(y_train);
 
   // define network
-  size_t layer_dims[] = {2, 2, 1}; // {dim_in, [dim_h, ...], dim_out}
-  Sigma s_hidden = SIGMOID;        // activation for hidden layers
-  Sigma s_output = IDENTITY;       // activation for output layer
+  size_t layer_dims[] = {2, 5, 1}; // {dim_in, [dim_h, ...], dim_out}
+  Sigma s_hidden = LEAKY_RELU;        // activation for hidden layers
+  Sigma s_output = SIGMOID;       // activation for output layer
 
   // alloc network
   NN nn = nn_create(layer_dims, ARRAY_LEN(layer_dims), s_hidden, s_output);
 
   // randomize network weights
+  // nn_rand(nn, -1, 1);
   nn_rand(nn, 0, 1);
+  NN_PRINT_WEIGHTS(nn);
 
   // setup training parameters
   const TrainParams train_params = {
-      .lr = 1e-1,
-      .epochs = 10000,
+      .lr = 1,
+      .epochs = 200,
       .batch_size = 2, // only for BGD,
       .gd_type = SGD,
   };
@@ -88,15 +91,14 @@ int main(void) {
   nn_train_loop(nn, x_train, y_train, train_params);
 
   // eval activations
-  for (size_t s = 0; s < x_train.num_rows; ++s) {
-    for (size_t i = 0; i < x_train.num_cols; ++i) {
-      MAT_AT(nn.activations[0], 0, i) = MAT_AT(x_train, s, i);
-    }
-    nn_forward(nn);
+  for (size_t s = 0; s < N_SAMPLES; ++s) {
+    nn_forward(nn, x_train, y_train, s);
     printf("%f ^ %f -> %f\n", MAT_AT(nn.activations[0], 0, 0),
            MAT_AT(nn.activations[0], 0, 1),
            MAT_AT(nn.activations[nn.n_layers - 1], 0, 0));
   }
+
+  NN_PRINT_WEIGHTS(nn);
 
   return 0;
 }
