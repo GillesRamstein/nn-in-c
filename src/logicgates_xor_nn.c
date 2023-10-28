@@ -7,7 +7,7 @@ gates.
 */
 
 #define NN_IMPLEMENTATION
-#include "nn.h"
+#include "../nn.h"
 
 #include <time.h>
 
@@ -68,14 +68,15 @@ int main(void) {
 
   // define network
   size_t layer_dims[] = {2, 5, 1}; // {dim_in, [dim_h, ...], dim_out}
-  Sigma s_hidden = LEAKY_RELU;        // activation for hidden layers
-  Sigma s_output = SIGMOID;       // activation for output layer
+  Sigma s_hidden = LEAKY_RELU;     // activation for hidden layers
+  Sigma s_output = SIGMOID;        // activation for output layer
 
   // alloc network
   NN nn = nn_create(layer_dims, ARRAY_LEN(layer_dims), s_hidden, s_output);
 
   // randomize network weights
   // nn_rand(nn, -1, 1);
+  // nn_rand(nn, -0.5, 0.5);
   nn_rand(nn, 0, 1);
   NN_PRINT_WEIGHTS(nn);
 

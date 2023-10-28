@@ -346,6 +346,8 @@ void mat_sigmoid(Matrix m) {
 
 // --------------------------------------------------------------
 
+// TODO: nn_ functions don't use mat_ functions. change nn_ ? remove mat_ ?
+
 NN nn_create(size_t *layer_dims, size_t n_layers, Sigma s_hidden,
              Sigma s_output) {
   NN_ASSERT(n_layers > 0);
