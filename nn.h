@@ -731,6 +731,10 @@ void nn_backprop(NN nn, const Matrix y, const size_t s) {
 }
 
 void nn_update_weights(NN nn, float lr, size_t n) {
+  /*******************************
+   * w_ij = w_ij * (-lr) * gw_ij *
+   * b_j  = b_j  * (-lr) * gb_j  *
+   *******************************/
   for (size_t l = 1; l < nn.n_layers; ++l) {
     for (size_t i = 0; i < nn.weights[l].num_rows; ++i) {
       for (size_t j = 0; j < nn.weights[l].num_cols; ++j) {
