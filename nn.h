@@ -560,6 +560,9 @@ void nn_train_loop(NN nn, Matrix x, Matrix y, TrainParams p) {
     mat_fill(nn.loss_epoch, 0);
     shuffle_array(sample_map, n_samples);
 
+    // save weights for visualization
+    // TODO: ...
+
     // batch loop
     for (size_t b = 0; b < n_batches; ++b) {
       mat_fill(nn.loss_batch, 0);
