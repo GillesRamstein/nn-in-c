@@ -543,6 +543,8 @@ void nn_train_loop(NN nn, Matrix x, Matrix y, TrainParams p) {
     n_batches = 1;
     batch_size = n_samples;
     break;
+  default:
+    NN_ASSERT(false && "unreachable");
   }
   printf("Batch size: %zu -> %zu batches per epoch (%zu samples skipped)\n\n",
          batch_size, n_batches, n_samples % batch_size);
