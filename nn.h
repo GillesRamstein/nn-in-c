@@ -126,6 +126,8 @@ void nn_clear_errors(NN nn);
 void nn_set_error_at_output_layer(NN nn, const Matrix y, const size_t s);
 void nn_backprop(NN nn, const Matrix y, const size_t s);
 void nn_update_weights(NN nn, const float lr, size_t n);
+void nn_save(NN nn, const char *file_path);
+NN nn_load(const char *file_path);
 
 #endif // NN_H
 
@@ -755,6 +757,136 @@ void nn_update_weights(NN nn, float lr, size_t n) {
       MAT_AT(nn.bias_grads[l], 0, j) = 0.f;
     }
   }
+}
+
+void nn_save(NN nn, const char *file_path) {
+  FILE *fp_write;
+  fp_write = fopen(file_path, "w");
+  if (!fp_write) {
+    fprintf(stderr, "ERROR: fopen write");
+    return;
+  }
+
+  // first line: number of layers
+  fprintf(fp_write, "%zu\n", nn.n_layers);
+
+  // second line: number of nodes for each layer
+  fprintf(fp_write, "%zu", nn.weights[1].num_rows);
+  for (size_t i = 1; i < nn.n_layers; ++i) {
+    fprintf(fp_write, " %zu", nn.weights[i].num_cols);
+  }
+  fprintf(fp_write, "\n");
+
+  // third line: hidden activation, output activation
+  fprintf(fp_write, "%i %i\n", nn.s_hidden, nn.s_output);
+
+  for (size_t i = 1; i < nn.n_layers; ++i) {
+    // layer weight rows
+    for (size_t k = 0; k < nn.weights[i].num_rows; ++k) {
+      for (size_t j = 0; j < nn.weights[i].num_cols; ++j) {
+        if (j == 0) {
+          fprintf(fp_write, "%f", MAT_AT(nn.weights[i], k, j));
+        } else {
+          fprintf(fp_write, " %f", MAT_AT(nn.weights[i], k, j));
+        }
+      }
+      fprintf(fp_write, "\n");
+    }
+    // layer bias row
+    for (size_t j = 0; j < nn.biases[i].num_cols; ++j) {
+      if (j == 0) {
+        fprintf(fp_write, "%f", MAT_AT(nn.biases[i], 0, j));
+      } else {
+        fprintf(fp_write, " %f", MAT_AT(nn.biases[i], 0, j));
+      }
+    }
+    fprintf(fp_write, "\n");
+  }
+  fclose(fp_write);
+}
+
+NN nn_load(const char *file_path) {
+  const size_t MAX_INT_LENGTH = 5;
+  const size_t DECIMAL_LENGTH = 10; // 10 for floats, 20 for doubles
+  size_t n;
+  char *buffc;
+
+  FILE *fp_read;
+  fp_read = fopen(file_path, "r");
+  NN_ASSERT(fp_read && "ERROR: fopen read");
+
+  // read first line
+  n = MAX_INT_LENGTH + 1;
+  buffc = malloc(sizeof(char) * n + 1);
+  NN_ASSERT(buffc && "ERROR: alloc buffc");
+  NN_ASSERT(fgets(buffc, n + 1, fp_read) && "ERROR: fgets");
+  size_t n_layers = atoi(buffc);
+
+  // read second line
+  n = (MAX_INT_LENGTH + 1) * n_layers + 1;
+  buffc = realloc(buffc, sizeof(char) * n);
+  NN_ASSERT(buffc && "ERROR: realloc buffc");
+  NN_ASSERT(fgets(buffc, n + 1, fp_read) && "ERROR: fgets");
+  size_t layer_dims[n_layers];
+  char *tk;
+  size_t max_dim = 0;
+  for (size_t i = 0; i < n_layers; ++i) {
+    if (i == 0) {
+      tk = strtok(buffc, " ");
+    } else {
+      tk = strtok(NULL, " ");
+    }
+    NN_ASSERT(tk);
+    layer_dims[i] = atoi(tk);
+    max_dim = layer_dims[i] > max_dim ? layer_dims[i] : max_dim;
+  }
+  printf("\n");
+
+  n = (DECIMAL_LENGTH + 1) * max_dim;
+  buffc = realloc(buffc, sizeof(char) * n);
+  NN_ASSERT(buffc && "ERROR: realloc buffc");
+
+  // read third line
+  NN_ASSERT(fgets(buffc, n + 1, fp_read) && "ERROR: fgets");
+  tk = strtok(buffc, " ");
+  Sigma s_hidden = atoi(tk);
+  tk = strtok(NULL, " ");
+  Sigma s_output = atoi(tk);
+
+  // alloc network
+  NN nn = nn_create(layer_dims, ARRAY_LEN(layer_dims), s_hidden, s_output);
+
+  // read weights
+  for (size_t i = 1; i < nn.n_layers; ++i) {
+    // weights
+    for (size_t k = 0; k < nn.weights[i].num_rows; ++k) {
+      NN_ASSERT(fgets(buffc, n + 1, fp_read) && "ERROR: fgets");
+      for (size_t j = 0; j < nn.weights[i].num_cols; ++j) {
+        if (j == 0) {
+          tk = strtok(buffc, " ");
+        } else {
+          tk = strtok(NULL, " ");
+        }
+        NN_ASSERT(tk);
+        MAT_AT(nn.weights[i], k, j) = strtof(tk, NULL);
+      }
+    }
+    // biases
+    NN_ASSERT(fgets(buffc, n + 1, fp_read) && "ERROR: fgets");
+    for (size_t j = 0; j < nn.biases[i].num_cols; ++j) {
+      if (j == 0) {
+        tk = strtok(buffc, " ");
+      } else {
+        tk = strtok(NULL, " ");
+      }
+      NN_ASSERT(tk);
+      MAT_AT(nn.biases[i], 0, j) = strtof(tk, NULL);
+    }
+  }
+
+  fclose(fp_read);
+  free(buffc);
+  return nn;
 }
 
 #endif // NN_IMPLEMENTATION
