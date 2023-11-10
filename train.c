@@ -178,12 +178,12 @@ float farray_min(float arr[], size_t len) {
   return result;
 }
 
-void handle_rendering(SDL_Renderer *renderer, int w, int h) {
+void handle_rendering(SDL_Renderer *renderer, int w, int h,
+                      const char *model_path) {
   SDL_RenderClear(renderer);
 
   // read model data
-  // NN nn = nn_load("tmp.gil");
-  NN nn = nn_load("xor.model");
+  NN nn = nn_load(model_path);
   size_t nodes[nn.n_layers];
   nodes[0] = nn.weights[1].num_rows;
   nodes[1] = nn.weights[1].num_cols;
@@ -209,7 +209,7 @@ void handle_rendering(SDL_Renderer *renderer, int w, int h) {
       }
     }
   }
-  printf("%f, %f, %f, %f\n", weight_max, weight_min, bias_max, bias_min);
+  // printf("%f, %f, %f, %f\n", weight_max, weight_min, bias_max, bias_min);
 
   // connections
   SDL_Color rgb_c;
@@ -223,10 +223,13 @@ void handle_rendering(SDL_Renderer *renderer, int w, int h) {
       for (size_t k = 0; k < nodes[i + 1]; ++k) {
         weight = MAT_AT(nn.weights[i + 1], j, k);
         // printf("%zu, (%zu, %zu) W: %f\n", i, j, k, weight);
-        hsv2rgb(scaler_linear(weight, weight_min, weight_max, 90, 360), 254, 254, &rgb_c);
+        hsv2rgb(scaler_linear(weight, weight_min, weight_max, 90, 360), 254,
+                254, &rgb_c);
         y2 = h / (nodes[i + 1] + 1) * (k + 1);
-        // aalineRGBA(renderer, x1, y1, x2, y2, rgb_c.r, rgb_c.g, rgb_c.b, 0x88);
-        thickLineRGBA(renderer, x1, y1, x2, y2, 2, rgb_c.r, rgb_c.g, rgb_c.b, 0x88);
+        // aalineRGBA(renderer, x1, y1, x2, y2, rgb_c.r, rgb_c.g, rgb_c.b,
+        // 0x88);
+        thickLineRGBA(renderer, x1, y1, x2, y2, 2, rgb_c.r, rgb_c.g, rgb_c.b,
+                      0x88);
       }
     }
   }
@@ -245,7 +248,8 @@ void handle_rendering(SDL_Renderer *renderer, int w, int h) {
         bias = 0;
       }
       // printf("%zu, (0, %zu) B: %f\n", i, j, bias);
-      hsv2rgb(scaler_linear(bias, bias_min, bias_max, 90, 360), 254, 254, &rgb_n);
+      hsv2rgb(scaler_linear(bias, bias_min, bias_max, 90, 360), 254, 254,
+              &rgb_n);
       y = h / (nodes[i] + 1) * (j + 1);
       aacircleRGBA(renderer, x, y, r, rgb_n.r, rgb_n.g, rgb_n.b, 0xFF);
       filledCircleRGBA(renderer, x, y, r - 1, rgb_n.r, rgb_n.g, rgb_n.b, 0xFF);
@@ -256,8 +260,7 @@ void handle_rendering(SDL_Renderer *renderer, int w, int h) {
   SDL_RenderPresent(renderer);
 }
 
-int main() {
-
+int visualize(const char *model_path) {
   // Setup SDL
   SDL_Window *window = NULL;
   SDL_Renderer *renderer = NULL;
@@ -283,7 +286,7 @@ int main() {
       handle_state();
 
       // render image
-      handle_rendering(renderer, w, h);
+      handle_rendering(renderer, w, h, model_path);
     }
 
     // cap loop rate
@@ -296,3 +299,5 @@ int main() {
   SDL_Quit();
   return 0;
 }
+
+int main() { return visualize("xor.model"); }
