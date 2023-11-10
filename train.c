@@ -210,12 +210,14 @@ int main() {
   next N-1 layers hold the weights for one layer
   */
 
-  size_t layer_dims[] = {2, 5, 1}; // {dim_in, [dim_h, ...], dim_out}
-  Sigma s_hidden = LEAKY_RELU;     // activation for hidden layers
-  Sigma s_output = SIGMOID;        // activation for output layer
-
-  // alloc network
-  NN nn = nn_create(layer_dims, ARRAY_LEN(layer_dims), s_hidden, s_output);
+  // create a test network to dump to file
+  size_t layer_dims_out[] = {2, 5, 1};
+  Sigma s_hidden_out = LEAKY_RELU; // activation for hidden layers
+  Sigma s_output_out = SIGMOID;    // activation for output layer
+  NN nn_out = nn_create(layer_dims_out, ARRAY_LEN(layer_dims_out), s_hidden_out,
+                        s_output_out);
+  nn_rand(nn_out, -1.0, 1.0);
+  NN_PRINT_WEIGHTS(nn_out);
 
   // write to file
   FILE *fp_w;
@@ -224,28 +226,43 @@ int main() {
     fprintf(stderr, "ERROR: fopen write");
     return 1;
   }
+
   // first line: number of layers
-  fprintf(fp_w, "%zu\n\n", nn.n_layers);
+  fprintf(fp_w, "%zu\n\n", nn_out.n_layers);
+
   // second line: number of nodes for each layer
-  fprintf(fp_w, "%zu ", nn.weights[1].num_rows);
-  for (size_t i = 1; i < nn.n_layers; ++i) {
-    fprintf(fp_w, "%zu ", nn.weights[i].num_cols);
+  fprintf(fp_w, "%zu", nn_out.weights[1].num_rows);
+  for (size_t i = 1; i < nn_out.n_layers; ++i) {
+    fprintf(fp_w, " %zu", nn_out.weights[i].num_cols);
   }
   fprintf(fp_w, "\n\n");
+
+  // third line: hidden activation, output activation
+  fprintf(fp_w, "%i %i\n\n", nn_out.s_hidden, nn_out.s_output);
+
   // biases for all layers except input layer
-  for (size_t i = 1; i < nn.n_layers; ++i) {
+  for (size_t i = 1; i < nn_out.n_layers; ++i) {
     // all biases for one layer on one line
-    for (size_t j = 0; j < nn.biases[i].num_cols; ++j) {
-      fprintf(fp_w, "%f ", MAT_AT(nn.biases[i], 0, j));
+    for (size_t j = 0; j < nn_out.biases[i].num_cols; ++j) {
+      if (j == 0) {
+        fprintf(fp_w, "%f", MAT_AT(nn_out.biases[i], 0, j));
+      } else {
+        fprintf(fp_w, " %f", MAT_AT(nn_out.biases[i], 0, j));
+      }
     }
     fprintf(fp_w, "\n\n");
   }
+
   // weights for all layer except input layer
-  for (size_t i = 1; i < nn.n_layers; ++i) {
+  for (size_t i = 1; i < nn_out.n_layers; ++i) {
     // one row per line
-    for (size_t k = 0; k < nn.weights[i].num_rows; ++k) {
-      for (size_t j = 0; j < nn.weights[i].num_cols; ++j) {
-        fprintf(fp_w, "%f ", MAT_AT(nn.biases[i], k, j));
+    for (size_t k = 0; k < nn_out.weights[i].num_rows; ++k) {
+      for (size_t j = 0; j < nn_out.weights[i].num_cols; ++j) {
+        if (j == 0) {
+          fprintf(fp_w, "%f", MAT_AT(nn_out.weights[i], k, j));
+        } else {
+          fprintf(fp_w, " %f", MAT_AT(nn_out.weights[i], k, j));
+        }
       }
       fprintf(fp_w, "\n");
     }
@@ -261,52 +278,142 @@ int main() {
     return 1;
   }
 
-  char *buffc = malloc(sizeof(size_t)+1);
+  // read first line
+  char *buffc = malloc(sizeof(size_t) + 1);
   if (!buffc) {
     fprintf(stderr, "ERROR: alloc buffc");
     return 1;
   }
-  // float bufff[10] = { 0 }; // better use malloc here
 
-  // read first line
   if (!fgets(buffc, sizeof(buffc), fp_r)) {
     fprintf(stderr, "ERROR: fgets");
     return 1;
   }
-  size_t n_layers = atoi(buffc);
-  printf("N_layers: %zu\n", n_layers);
+  size_t n_layers_in = atoi(buffc);
 
   // read separator line
-  if (!fgets(buffc, sizeof(buffc), fp_r)) {
+  if (!fgets(buffc, 2, fp_r)) {
     fprintf(stderr, "ERROR: fgets");
     return 1;
   }
 
   // read second line
-  printf("N_nodes per layer: ");
-  buffc = realloc(buffc, sizeof(buffc)*3+1);
+  buffc = realloc(buffc, sizeof(size_t) * n_layers_in + 1);
   if (!buffc) {
     fprintf(stderr, "ERROR: realloc buffc");
     return 1;
   }
+  // TODO: only allows for 999 neurons per layers...
+  if (!fgets(buffc, 3 * n_layers_in, fp_r)) {
+    fprintf(stderr, "ERROR: fgets");
+    return 1;
+  }
+  size_t layer_dims_in[n_layers_in];
+  char *tk;
+  size_t max_dim = 0;
+  for (size_t i = 0; i < n_layers_in; ++i) {
+    if (i == 0) {
+      tk = strtok(buffc, " ");
+    } else {
+      tk = strtok(NULL, " ");
+    }
+    NN_ASSERT(tk);
+    layer_dims_in[i] = atoi(tk);
+    max_dim = layer_dims_in[i] > max_dim ? layer_dims_in[i] : max_dim;
+  }
+  printf("\n");
+
+  buffc = realloc(buffc, sizeof(float) * max_dim + 1);
+  if (!buffc) {
+    fprintf(stderr, "ERROR: realloc buffc");
+    return 1;
+  }
+
+  // read separator line
+  if (!fgets(buffc, 2, fp_r)) {
+    fprintf(stderr, "ERROR: fgets");
+    return 1;
+  }
+
+  // read third line
   if (!fgets(buffc, sizeof(buffc), fp_r)) {
     fprintf(stderr, "ERROR: fgets");
     return 1;
   }
-  char *tk;
   tk = strtok(buffc, " ");
-  size_t tmp;
-  while (tk!=NULL) {
-    // bufff[i++] = strtof(tk, NULL);
-    tmp = atoi(tk);
-    if (!tmp) {
-      break;
-    };
-    // tmp = strtof(tk, NULL);
-    tk = strtok(NULL, " ");
-    printf("%zu ", tmp);
+  Sigma s_hidden_in = atoi(tk);
+  tk = strtok(NULL, " ");
+  Sigma s_output_in = atoi(tk);
+  printf("Activation functions: hidden:%i output:%i\n", s_hidden_in,
+         s_output_in);
+
+  // alloc network
+  NN nn_in = nn_create(layer_dims_in, ARRAY_LEN(layer_dims_in), s_hidden_in,
+                       s_output_in);
+
+  // read separator line
+  if (!fgets(buffc, 2, fp_r)) {
+    fprintf(stderr, "ERROR: fgets");
+    return 1;
   }
-  printf("\n");
+
+  // read biases
+  for (size_t i = 1; i < nn_in.n_layers; ++i) {
+    // TODO: 10 is only sufficient for floats
+    if (!fgets(buffc, 10 * nn_in.biases[i].num_cols + 1, fp_r)) {
+      fprintf(stderr, "ERROR: fgets");
+      return 1;
+    }
+    for (size_t j = 0; j < nn_in.biases[i].num_cols; ++j) {
+      if (j == 0) {
+        tk = strtok(buffc, " ");
+      } else {
+        tk = strtok(NULL, " ");
+      }
+      NN_ASSERT(tk);
+      MAT_AT(nn_in.biases[i], 0, j) = strtof(tk, NULL);
+    }
+    // read separator line
+    if (!fgets(buffc, 2, fp_r)) {
+      fprintf(stderr, "ERROR: fgets");
+      return 1;
+    }
+  }
+
+  // read separator line
+  if (!fgets(buffc, 2, fp_r)) {
+    fprintf(stderr, "ERROR: fgets");
+    return 1;
+  }
+
+  // read weights
+  for (size_t i = 1; i < nn_in.n_layers; ++i) {
+    for (size_t k = 0; k < nn_in.weights[i].num_rows; ++k) {
+      // TODO: 10 is only sufficient for floats
+      if (!fgets(buffc, 10 * nn_in.weights[i].num_cols + 1, fp_r)) {
+        fprintf(stderr, "ERROR: fgets");
+        return 1;
+      }
+      printf("%zu-%zu: %s\n", i, k, buffc);
+      for (size_t j = 0; j < nn_in.weights[i].num_cols; ++j) {
+        if (j == 0) {
+          tk = strtok(buffc, " ");
+        } else {
+          tk = strtok(NULL, " ");
+        }
+        NN_ASSERT(tk);
+        MAT_AT(nn_in.weights[i], k, j) = strtof(tk, NULL);
+      }
+    }
+
+    // read separator line
+    if (!fgets(buffc, 2, fp_r)) {
+      fprintf(stderr, "ERROR: fgets");
+      return 1;
+    }
+  }
+
+  NN_PRINT_WEIGHTS(nn_in);
 
   free(buffc);
   fclose(fp_r);
