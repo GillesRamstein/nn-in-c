@@ -1,4 +1,3 @@
-#include <SDL2/SDL_video.h>
 #include <math.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -105,7 +104,7 @@ int init_sdl(SDL_Window **window, SDL_Renderer **renderer) {
   return true;
 }
 
-void handle_inputs(SDL_Event *event, int *quit) {
+void handle_inputs(SDL_Event *event, int *quit, int *pause) {
   while (SDL_PollEvent(event)) {
     switch (event->type) {
     case SDL_QUIT:
@@ -117,6 +116,9 @@ void handle_inputs(SDL_Event *event, int *quit) {
       switch (event->key.keysym.sym) {
       case SDLK_ESCAPE:
         *quit = true;
+        break;
+      case SDLK_p:
+        *pause = *pause == true ? false : true;
         break;
       default:
         break;
@@ -138,7 +140,40 @@ size_t array_max(size_t arr[], size_t len) {
   }
   size_t result = arr[0];
   for (size_t i = 1; i < len; ++i) {
-    result = arr[0] > result ? arr[0] : result;
+    result = arr[i] > result ? arr[i] : result;
+  }
+  return result;
+}
+
+size_t array_min(size_t arr[], size_t len) {
+  if (!arr || len < 1) {
+    return 0;
+  }
+  size_t result = arr[0];
+  for (size_t i = 1; i < len; ++i) {
+    result = arr[i] < result ? arr[i] : result;
+  }
+  return result;
+}
+
+float farray_max(float arr[], size_t len) {
+  if (!arr || len < 1) {
+    return 0;
+  }
+  float result = arr[0];
+  for (size_t i = 1; i < len; ++i) {
+    result = arr[i] > result ? arr[i] : result;
+  }
+  return result;
+}
+
+float farray_min(float arr[], size_t len) {
+  if (!arr || len < 1) {
+    return 0;
+  }
+  float result = arr[0];
+  for (size_t i = 1; i < len; ++i) {
+    result = arr[i] < result ? arr[i] : result;
   }
   return result;
 }
@@ -146,85 +181,82 @@ size_t array_max(size_t arr[], size_t len) {
 void handle_rendering(SDL_Renderer *renderer, int w, int h) {
   SDL_RenderClear(renderer);
 
-  // TODO: read data from model
-  size_t n_layers = 6;
-  size_t nodes[] = {4, 8, 12, 12, 5, 1};
-  size_t max_nodes = array_max(nodes, n_layers);
+  // read model data
+  // NN nn = nn_load("tmp.gil");
+  NN nn = nn_load("xor.model");
+  size_t nodes[nn.n_layers];
+  nodes[0] = nn.weights[1].num_rows;
+  nodes[1] = nn.weights[1].num_cols;
+  for (size_t i = 2; i < nn.n_layers; ++i) {
+    nodes[i] = nn.weights[i].num_cols;
+  }
+  size_t max_nodes = array_max(nodes, nn.n_layers);
+
+  // get max/min values for color scaling
+  float weight_max = 0.0;
+  float weight_min = 0.0;
+  float bias_max = 0.0;
+  float bias_min = 0.0;
+  for (size_t i = 1; i < nn.n_layers; ++i) {
+    for (size_t j = 0; j < nn.weights[i].num_cols; ++j) {
+      float b = MAT_AT(nn.biases[i], 0, j);
+      bias_min = bias_min > b ? b : bias_min;
+      bias_max = bias_max < b ? b : bias_max;
+      for (size_t k = 0; k < nn.weights[i].num_rows; ++k) {
+        float w = MAT_AT(nn.weights[i], k, j);
+        weight_min = weight_min > w ? w : weight_min;
+        weight_max = weight_max < w ? w : weight_max;
+      }
+    }
+  }
+  printf("%f, %f, %f, %f\n", weight_max, weight_min, bias_max, bias_min);
 
   // connections
   SDL_Color rgb_c;
   int x1, y1, x2, y2;
-  for (size_t i = 0; i < n_layers - 1; ++i) {
-    x1 = w / (n_layers + 1) * (i + 1);
-    x2 = w / (n_layers + 1) * (i + 2);
+  float weight;
+  for (size_t i = 0; i < nn.n_layers - 1; ++i) {
+    x1 = w / (nn.n_layers + 1) * (i + 1);
+    x2 = w / (nn.n_layers + 1) * (i + 2);
     for (size_t j = 0; j < nodes[i]; ++j) {
       y1 = h / (nodes[i] + 1) * (j + 1);
       for (size_t k = 0; k < nodes[i + 1]; ++k) {
+        weight = MAT_AT(nn.weights[i + 1], j, k);
+        // printf("%zu, (%zu, %zu) W: %f\n", i, j, k, weight);
+        hsv2rgb(scaler_linear(weight, weight_min, weight_max, 90, 360), 254, 254, &rgb_c);
         y2 = h / (nodes[i + 1] + 1) * (k + 1);
-        // dummy colors TODO: use real weights
-        hsv2rgb(
-            scaler_linear((x1 + x2) * (y1 + y1), 0, 2 * 1920 * 1080, 0, 360),
-            254, 254, &rgb_c);
-        aalineRGBA(renderer, x1, y1, x2, y2, rgb_c.r, rgb_c.g, rgb_c.b, 0x88);
-        // thickLineRGBA(renderer, x1, y1, x2, y2, 2, rgb_c.r, rgb_c.g, rgb_c.b,
-        // 0x88);
+        // aalineRGBA(renderer, x1, y1, x2, y2, rgb_c.r, rgb_c.g, rgb_c.b, 0x88);
+        thickLineRGBA(renderer, x1, y1, x2, y2, 2, rgb_c.r, rgb_c.g, rgb_c.b, 0x88);
       }
     }
   }
 
-  // count nodes for fake node color values
-  int n_nodes = 0;
-  for (size_t i = 0; i < n_layers; ++i) {
-    n_nodes += nodes[i];
-  }
-
   // nodes
   SDL_Color rgb_n;
-  int r = (w > h ? w / n_layers : h / max_nodes) / 9;
+  int r = (w > h ? w / nn.n_layers : h / max_nodes) / 9;
   int x, y;
-  for (size_t i = 0; i < n_layers; ++i) {
-    x = w / (n_layers + 1) * (i + 1);
+  float bias;
+  for (size_t i = 0; i < nn.n_layers; ++i) {
+    x = w / (nn.n_layers + 1) * (i + 1);
     for (size_t j = 0; j < nodes[i]; ++j) {
+      if (i > 0) {
+        bias = MAT_AT(nn.weights[i], 0, j);
+      } else {
+        bias = 0;
+      }
+      // printf("%zu, (0, %zu) B: %f\n", i, j, bias);
+      hsv2rgb(scaler_linear(bias, bias_min, bias_max, 90, 360), 254, 254, &rgb_n);
       y = h / (nodes[i] + 1) * (j + 1);
-      // dummy colors TODO: use real biases
-      hsv2rgb(scaler_linear(x * y, 0, 1920 * 1080, 0, 360), 254, 254, &rgb_n);
-      // printf("%d %d [%d, %d, %d]\n", x, y, rgb.r, rgb.g, rgb.b);
-      // TODO: find antialiased filled circle
       aacircleRGBA(renderer, x, y, r, rgb_n.r, rgb_n.g, rgb_n.b, 0xFF);
-      // filledCircleRGBA(renderer, x, y, r - 1, rgb_n.r, rgb_n.g, rgb_n.b,
-      // 0xFF);
+      filledCircleRGBA(renderer, x, y, r - 1, rgb_n.r, rgb_n.g, rgb_n.b, 0xFF);
     }
   }
 
-  SDL_SetRenderDrawColor(renderer, 0x23, 0x23, 0x23, 255);
+  SDL_SetRenderDrawColor(renderer, 0x23, 0x23, 0x23, 155);
   SDL_RenderPresent(renderer);
 }
 
 int main() {
-
-  /*
-  File Structure
-  first layer holds numbers of layers: size_t N
-  second layer holds number of nodes for each of the N layers: N * size_t n
-  next N-1 layers hold the biases for one layer
-  next N-1 layers hold the weights for one layer
-  */
-
-  // create a test network to dump to file
-  size_t layer_dims_out[] = {4, 8, 2};
-  Sigma s_hidden_out = RELU; // activation for hidden layers
-  Sigma s_output_out = IDENTITY;    // activation for output layer
-  NN nn_out = nn_create(layer_dims_out, ARRAY_LEN(layer_dims_out), s_hidden_out,
-                        s_output_out);
-  nn_rand(nn_out, -1.0, 1.0);
-  NN_PRINT_WEIGHTS(nn_out);
-
-  nn_save(nn_out, "tmp.gil");
-  NN nn_in = nn_load("tmp.gil");
-
-  NN_PRINT_WEIGHTS(nn_in);
-
-  return 0;
 
   // Setup SDL
   SDL_Window *window = NULL;
@@ -237,19 +269,22 @@ int main() {
 
   SDL_Event event;
   int quit = false;
+  int pause = false;
   while (!quit) {
 
     // SDL_GetWindowSize(window, &w, &h);
     SDL_GetWindowSizeInPixels(window, &w, &h);
 
     // process inputs
-    handle_inputs(&event, &quit);
+    handle_inputs(&event, &quit, &pause);
 
-    // update state
-    handle_state();
+    if (!pause) {
+      // update state
+      handle_state();
 
-    // render image
-    handle_rendering(renderer, w, h);
+      // render image
+      handle_rendering(renderer, w, h);
+    }
 
     // cap loop rate
     SDL_Delay(RENDER_RATE);

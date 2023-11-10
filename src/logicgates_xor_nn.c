@@ -100,6 +100,7 @@ int main(void) {
   }
 
   NN_PRINT_WEIGHTS(nn);
+  nn_save(nn, "xor.model");
 
   return 0;
 }
