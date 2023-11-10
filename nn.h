@@ -546,7 +546,8 @@ void nn_train_loop(NN nn, Matrix x, Matrix y, TrainParams p) {
     batch_size = n_samples;
     break;
   default:
-    NN_ASSERT(false && "unreachable");
+    printf("unreachable");
+    return;
   }
   printf("Batch size: %zu -> %zu batches per epoch (%zu samples skipped)\n\n",
          batch_size, n_batches, n_samples % batch_size);
@@ -840,7 +841,6 @@ NN nn_load(const char *file_path) {
     layer_dims[i] = atoi(tk);
     max_dim = layer_dims[i] > max_dim ? layer_dims[i] : max_dim;
   }
-  printf("\n");
 
   n = (DECIMAL_LENGTH + 1) * max_dim;
   buffc = realloc(buffc, sizeof(char) * n);
